@@ -1,0 +1,63 @@
+{
+  "expo": {
+    "name": "Okkazo",
+    "slug": "okkazo",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/images/Splash.png",
+    "scheme": "okkazo",
+    "userInterfaceStyle": "automatic",
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.okkazo.mobile",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
+    },
+    "android": {
+      "package": "com.okkazo.mobile",
+      "adaptiveIcon": {
+        "backgroundColor": "#E6F4FE",
+        "foregroundImage": "./assets/images/Splash.png",
+        "backgroundImage": "./assets/images/Splash.png",
+        "monochromeImage": "./assets/images/Splash.png"
+      },
+      "predictiveBackGestureEnabled": false
+    },
+    "web": {
+      "output": "static",
+      "favicon": "./assets/images/Splash.png"
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/images/Splash.png",
+          "imageWidth": 200,
+          "resizeMode": "contain",
+          "backgroundColor": "#042498",
+          "dark": {
+            "backgroundColor": "#042498"
+          }
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": true,
+      "reactCompiler": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "c976e4df-07c0-46ae-8bb7-d68fc1395469"
+      }
+    },
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/c976e4df-07c0-46ae-8bb7-d68fc1395469"
+    }
+  }
+}
