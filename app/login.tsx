@@ -1,7 +1,6 @@
-import { LinearGradient } from "expo-linear-gradient";
+import * as Google from "expo-auth-session/providers/google";
 import { router } from "expo-router";
 import * as WebBrowser from "expo-web-browser";
-import * as Google from "expo-auth-session/providers/google";
 import { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
@@ -17,7 +16,6 @@ import {
 
 import { GOOGLE_CLIENT_IDS, hasGoogleClientConfig } from "@/src/config/env";
 import { useAuth } from "@/src/providers/AuthProvider";
-import { palette } from "@/src/theme/palette";
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -101,61 +99,70 @@ export default function LoginPage() {
   };
 
   return (
-    <LinearGradient colors={["#042498", "#05329F", "#035C72"]} style={styles.screen}>
+    <View style={styles.screen}>
       <KeyboardAvoidingView
         style={styles.content}
         behavior={Platform.OS === "ios" ? "padding" : undefined}
       >
         <View style={styles.headerWrap}>
-          <Image 
-            source={require("../assets/images/Splash.png")} 
-            style={styles.logo} 
-            resizeMode="contain" 
+          <Image
+            source={require("../assets/images/logo.png")}
+            style={styles.logo}
+            resizeMode="contain"
           />
+          <Text style={styles.title}>Welcome back</Text>
           <Text style={styles.subtitle}>Sign in to continue to your workspace.</Text>
         </View>
 
         <View style={styles.card}>
-          <Text style={styles.inputLabel}>Email</Text>
-          <TextInput
-            value={email}
-            onChangeText={setEmail}
-            placeholder="you@company.com"
-            placeholderTextColor="#64748b"
-            keyboardType="email-address"
-            autoCapitalize="none"
-            autoCorrect={false}
-            style={styles.input}
-          />
+          <View style={styles.inputGroup}>
+            <Text style={styles.inputLabel}>Email</Text>
+            <TextInput
+              value={email}
+              onChangeText={setEmail}
+              placeholder="you@company.com"
+              placeholderTextColor="#8c90a0"
+              keyboardType="email-address"
+              autoCapitalize="none"
+              autoCorrect={false}
+              style={styles.input}
+            />
+          </View>
 
-          <Text style={styles.inputLabel}>Password</Text>
-          <TextInput
-            value={password}
-            onChangeText={setPassword}
-            placeholder="Enter your password"
-            placeholderTextColor="#64748b"
-            secureTextEntry
-            autoCapitalize="none"
-            style={styles.input}
-          />
+          <View style={styles.inputGroup}>
+            <Text style={styles.inputLabel}>Password</Text>
+            <TextInput
+              value={password}
+              onChangeText={setPassword}
+              placeholder="Enter your password"
+              placeholderTextColor="#8c90a0"
+              secureTextEntry
+              autoCapitalize="none"
+              style={styles.input}
+            />
+          </View>
 
           {error ? <Text style={styles.errorText}>{error}</Text> : null}
 
           <Pressable
             onPress={handleEmailLogin}
             disabled={!canSubmit}
-            style={[styles.primaryButton, !canSubmit && styles.disabledButton]}
+            style={({ pressed }) => [
+              styles.primaryButton,
+              !canSubmit && styles.disabledButton,
+              pressed && styles.primaryButtonPressed
+            ]}
           >
             {isSubmitting ? (
-              <ActivityIndicator color="#ffffff" />
+              <ActivityIndicator color="#002c72" />
             ) : (
-              <Text style={styles.primaryButtonText}>Login with Email</Text>
+              <Text style={styles.primaryButtonText}>Sign In</Text>
             )}
           </Pressable>
 
           <View style={styles.dividerWrap}>
             <View style={styles.dividerLine} />
-            <Text style={styles.dividerText}>or</Text>
+            <Text style={styles.dividerText}>OR</Text>
             <View style={styles.dividerLine} />
           </View>
 
@@ -177,108 +184,129 @@ export default function LoginPage() {
           ) : null}
         </View>
       </KeyboardAvoidingView>
-    </LinearGradient>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
+    backgroundColor: "#0f131f",
   },
   content: {
     flex: 1,
     justifyContent: "center",
-    paddingHorizontal: 20,
-    paddingVertical: 28,
-    gap: 28,
+    paddingHorizontal: 24,
+    paddingVertical: 32,
+    gap: 32,
   },
   headerWrap: {
-    gap: 8,
+    gap: 12,
+    alignItems: "center",
   },
   logo: {
-    width: 240,
-    height: 80,
-    alignSelf: "flex-start",
+    width: 260,
+    height: 100,
+    marginBottom: 16,
+  },
+  title: {
+    color: "#dfe2f3",
+    fontSize: 28,
+    fontWeight: "800",
+    letterSpacing: -0.5,
   },
   subtitle: {
-    color: "#dbe3ff",
-    fontSize: 16,
+    color: "#c2c6d7",
+    fontSize: 15,
     lineHeight: 22,
+    textAlign: "center",
   },
   card: {
-    backgroundColor: palette.surface,
-    borderRadius: 20,
-    padding: 20,
-    gap: 12,
+    backgroundColor: "rgba(27, 31, 44, 0.7)",
+    borderRadius: 24,
+    padding: 24,
+    gap: 20,
     borderWidth: 1,
-    borderColor: palette.border,
+    borderColor: "rgba(66, 70, 84, 0.15)",
+  },
+  inputGroup: {
+    gap: 8,
   },
   inputLabel: {
-    color: palette.textPrimary,
-    fontWeight: "700",
+    color: "#dfe2f3",
+    fontWeight: "600",
     fontSize: 14,
   },
   input: {
-    borderWidth: 1,
-    borderColor: palette.border,
-    borderRadius: 12,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    color: palette.textPrimary,
+    backgroundColor: "#313442",
+    borderRadius: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    color: "#dfe2f3",
     fontSize: 15,
   },
   errorText: {
-    color: palette.danger,
+    color: "#ffb4ab",
     fontSize: 13,
     lineHeight: 18,
   },
   primaryButton: {
-    borderRadius: 12,
-    backgroundColor: palette.main,
-    paddingVertical: 13,
+    borderRadius: 999,
+    backgroundColor: "#b1c5ff",
+    paddingVertical: 16,
     alignItems: "center",
     marginTop: 8,
+    shadowColor: "#b1c5ff",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 12,
+    elevation: 5,
+  },
+  primaryButtonPressed: {
+    backgroundColor: "#5a8cff",
   },
   primaryButtonText: {
-    color: "#ffffff",
+    color: "#002c72",
     fontWeight: "700",
-    fontSize: 15,
+    fontSize: 16,
   },
   dividerWrap: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 10,
+    gap: 16,
     marginVertical: 4,
   },
   dividerLine: {
     flex: 1,
     height: 1,
-    backgroundColor: palette.border,
+    backgroundColor: "rgba(66, 70, 84, 0.3)",
   },
   dividerText: {
-    color: palette.textMuted,
-    fontSize: 13,
+    color: "#c2c6d7",
+    fontSize: 12,
+    fontWeight: "600",
   },
   secondaryButton: {
-    borderRadius: 12,
+    borderRadius: 999,
     borderWidth: 1,
-    borderColor: palette.accent,
-    paddingVertical: 13,
+    borderColor: "rgba(66, 70, 84, 0.3)",
+    paddingVertical: 16,
     alignItems: "center",
-    backgroundColor: palette.secondary,
+    backgroundColor: "#0a0e1a",
   },
   secondaryButtonText: {
-    color: palette.accent,
-    fontWeight: "700",
-    fontSize: 15,
+    color: "#dfe2f3",
+    fontWeight: "600",
+    fontSize: 16,
   },
   disabledButton: {
-    opacity: 0.55,
+    opacity: 0.5,
   },
   helperText: {
-    color: palette.textMuted,
+    color: "#c2c6d7",
     fontSize: 12,
     lineHeight: 18,
     marginTop: 4,
+    textAlign: "center",
   },
 });

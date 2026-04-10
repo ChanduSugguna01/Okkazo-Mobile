@@ -3,17 +3,17 @@ import { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Pressable,
-  SafeAreaView,
   ScrollView,
   StyleSheet,
   Text,
   View,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useAuth } from "@/src/providers/AuthProvider";
-import { getPlanningEventById } from "@/src/services/events";
+import { getPlanningEventById, getEventTicketGuests } from "@/src/services/events";
 import { palette } from "@/src/theme/palette";
-import { PlanningEvent } from "@/src/types/events";
+import { PlanningEvent, EventTicketGuest } from "@/src/types/events";
 
 const formatDateLabel = (value: string | null | undefined) => {
   if (!value) {
@@ -41,6 +41,10 @@ export default function EventDetailsPage() {
   const [event, setEvent] = useState<PlanningEvent | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  
+  const [guests, setGuests] = useState<EventTicketGuest[]>([]);
+  const [loadingGuests, setLoadingGuests] = useState(true);
+  const [guestError, setGuestError] = useState<string | null>(null);
 
   const normalizedEventId = useMemo(() => {
     if (!eventId) {
@@ -73,16 +77,39 @@ export default function EventDetailsPage() {
     load();
   }, [session?.accessToken, normalizedEventId]);
 
+  useEffect(() => {
+    const loadGuests = async () => {
+      if (!session?.accessToken || !normalizedEventId) {
+        setLoadingGuests(false);
+        return;
+      }
+      try {
+        setLoadingGuests(true);
+        setGuestError(null);
+        const guestData = await getEventTicketGuests(session.accessToken, normalizedEventId);
+        setGuests(guestData || []);
+      } catch (err) {
+        const message = err instanceof Error ? err.message : "Failed to load guest list";
+        setGuestError(message);
+      } finally {
+        setLoadingGuests(false);
+      }
+    };
+
+    loadGuests();
+  }, [session?.accessToken, normalizedEventId]);
+
   if (!session) {
     return <Redirect href="/login" />;
   }
 
+  const { top } = useSafeAreaInsets();
   const startAt = event?.schedule?.startAt ?? event?.eventDate;
   const endAt = event?.schedule?.endAt;
 
   return (
-    <SafeAreaView style={styles.screen}>
-      <ScrollView contentContainerStyle={styles.content}>
+    <View style={styles.screen}>
+      <ScrollView contentContainerStyle={[styles.content, { paddingTop: Math.max(top, 32) + 16 }]}>
         <Pressable onPress={() => router.back()}>
           <Text style={styles.backLink}>Back</Text>
         </Pressable>
@@ -151,8 +178,51 @@ export default function EventDetailsPage() {
             </Pressable>
           </View>
         ) : null}
+
+        {/* Guest List Section */}
+        {!loading && event ? (
+          <View style={styles.guestSection}>
+            <Text style={styles.guestTitle}>Guest List</Text>
+            
+            {loadingGuests ? (
+              <ActivityIndicator size="small" color={palette.main} style={{ marginVertical: 20 }} />
+            ) : guestError ? (
+              <Text style={styles.errorText}>{guestError}</Text>
+            ) : guests.length === 0 ? (
+              <Text style={styles.emptyGuestText}>No guests found.</Text>
+            ) : (
+              <View style={styles.guestListWrap}>
+                {guests.map((guest, idx) => {
+                  const verified = guest.verification?.status?.toUpperCase() === "VERIFIED" || guest.ticketStatus?.toUpperCase() === "ATTENDED";
+                  const quantity = guest.tickets?.noOfTickets || 1;
+                  const guestName = guest.guestName || guest.userAuthId?.slice(0, 8) || "Guest";
+                  
+                  return (
+                    <View key={guest.ticketId} style={styles.guestCard}>
+                      <View style={styles.guestRow}>
+                        <View style={styles.guestSerialBadge}>
+                          <Text style={styles.guestSerialText}>{idx + 1}</Text>
+                        </View>
+                        <View style={styles.guestInfoCol}>
+                          <Text style={styles.guestName}>{guestName}</Text>
+                          <Text style={styles.guestMetaText}>Ticket: {guest.ticketId.slice(0, 8).toUpperCase()}</Text>
+                          <Text style={styles.guestMetaText}>Qty: {quantity}</Text>
+                        </View>
+                        <View style={[styles.statusBadge, verified && styles.statusBadgeVerified]}>
+                          <Text style={[styles.statusText, verified && styles.statusTextVerified]}>
+                            {verified ? "ATTENDED" : guest.ticketStatus}
+                          </Text>
+                        </View>
+                      </View>
+                    </View>
+                  );
+                })}
+              </View>
+            )}
+          </View>
+        ) : null}
       </ScrollView>
-    </SafeAreaView>
+    </View>
   );
 }
 
@@ -248,5 +318,78 @@ const styles = StyleSheet.create({
     color: "#ffffff",
     fontSize: 14,
     fontWeight: "700",
+  },
+  guestSection: {
+    marginTop: 8,
+    gap: 12,
+  },
+  guestTitle: {
+    color: palette.textPrimary,
+    fontSize: 20,
+    fontWeight: "800",
+    marginLeft: 4,
+  },
+  emptyGuestText: {
+    color: palette.textMuted,
+    fontSize: 14,
+    marginLeft: 4,
+  },
+  guestListWrap: {
+    gap: 8,
+  },
+  guestCard: {
+    backgroundColor: palette.surface,
+    borderWidth: 1,
+    borderColor: palette.border,
+    borderRadius: 12,
+    padding: 12,
+  },
+  guestRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  guestSerialBadge: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: palette.border,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  guestSerialText: {
+    color: palette.textPrimary,
+    fontSize: 12,
+    fontWeight: "700",
+  },
+  guestInfoCol: {
+    flex: 1,
+    gap: 2,
+  },
+  guestName: {
+    color: palette.textPrimary,
+    fontSize: 15,
+    fontWeight: "700",
+  },
+  guestMetaText: {
+    color: palette.textMuted,
+    fontSize: 12,
+  },
+  statusBadge: {
+    backgroundColor: "rgba(255, 180, 171, 0.15)",
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+  },
+  statusBadgeVerified: {
+    backgroundColor: "rgba(74, 222, 128, 0.15)",
+  },
+  statusText: {
+    color: palette.danger,
+    fontSize: 10,
+    fontWeight: "800",
+  },
+  statusTextVerified: {
+    color: palette.success,
   },
 });

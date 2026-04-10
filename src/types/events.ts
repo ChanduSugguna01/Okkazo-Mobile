@@ -43,3 +43,23 @@ export interface QrVerificationResult {
   paidAt: string | null;
   scannedAt: string;
 }
+
+export interface EventTicketGuest {
+  ticketId: string;
+  userAuthId: string;
+  guestName?: string;
+  guestEmail?: string;
+  ticketStatus: string;
+  verification?: {
+    status: string;
+    verifiedAt: string | null;
+    lastScannedAt: string | null;
+    scanCount: number;
+    scanHistory: any[];
+  };
+  tickets: {
+    ticketType: string;
+    noOfTickets: number;
+    tiers: TicketTier[];
+  };
+}

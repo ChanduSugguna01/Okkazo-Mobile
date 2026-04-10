@@ -55,7 +55,7 @@ const styles = StyleSheet.create({
   },
   badge: {
     alignSelf: "flex-start",
-    color: "#ffffff",
+    color: "#481d00",
     backgroundColor: palette.accent,
     paddingHorizontal: 10,
     paddingVertical: 4,
@@ -64,29 +64,29 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
   title: {
-    color: "#ffffff",
+    color: palette.textPrimary,
     fontSize: 30,
     fontWeight: "800",
   },
   subtitle: {
-    color: "#dbe3ff",
+    color: palette.textMuted,
     fontSize: 15,
     lineHeight: 22,
   },
   copy: {
-    color: "#e7ecff",
+    color: palette.textMuted,
     fontSize: 14,
     lineHeight: 21,
   },
   metaWrap: {
     marginTop: 6,
     gap: 4,
-    backgroundColor: "#032072",
+    backgroundColor: palette.surface,
     borderRadius: 12,
     padding: 12,
   },
   metaText: {
-    color: "#eff6ff",
+    color: palette.textPrimary,
     fontSize: 13,
   },
   button: {

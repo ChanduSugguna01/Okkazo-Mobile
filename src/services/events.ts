@@ -99,6 +99,12 @@ export const verifyTicketQr = async (token: string, qrToken: string) => {
   return response.data;
 };
 
+export const getEventTicketGuests = async (token: string, eventId: string) => {
+  const response = await request<ApiEnvelope<any>>(`/api/events/tickets/events/${encodeURIComponent(eventId)}/guests?limit=500`, { token });
+  const data = response.data;
+  return (data?.guests || data?.items || data?.tickets || (Array.isArray(data) ? data : [])) as EventTicketGuest[];
+};
+
 export const splitCurrentAndUpcomingEvents = (events: PlanningEvent[]) => {
   const now = new Date();
   const current: PlanningEvent[] = [];

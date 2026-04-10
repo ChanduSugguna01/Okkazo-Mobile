@@ -4,12 +4,13 @@ import {
   ActivityIndicator,
   Pressable,
   RefreshControl,
-  SafeAreaView,
   ScrollView,
   StyleSheet,
   Text,
   View,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { Ionicons } from "@expo/vector-icons";
 
 import { useAuth } from "@/src/providers/AuthProvider";
 import { getCoordinatorEvents, splitCurrentAndUpcomingEvents } from "@/src/services/events";
@@ -49,20 +50,29 @@ const EventCard = ({ event }: { event: PlanningEvent }) => {
           params: { eventId: event.eventId },
         })
       }
-      style={styles.eventCard}
+      style={({ pressed }) => [styles.eventCard, pressed && styles.eventCardPressed]}
     >
-      <Text style={styles.eventTitle}>{event.eventTitle ?? "Untitled Event"}</Text>
-      <Text style={styles.eventDate}>{formatDateLabel(startAt)}</Text>
-      <View style={styles.metaRow}>
-        <Text style={styles.metaPill}>{event.category?.toUpperCase() ?? "EVENT"}</Text>
-        <Text style={styles.metaPill}>{event.status ?? "UNKNOWN"}</Text>
+      <View style={styles.eventCardHeader}>
+        <Text style={styles.eventTitle}>{event.eventTitle ?? "Untitled Event"}</Text>
+        <Ionicons name="chevron-forward" size={20} color={palette.textMuted} />
+      </View>
+      <View style={styles.eventCardBody}>
+        <View style={styles.eventDetailRow}>
+          <Ionicons name="calendar-outline" size={16} color={palette.textMuted} />
+          <Text style={styles.eventDate}>{formatDateLabel(startAt)}</Text>
+        </View>
+        <View style={styles.metaRow}>
+          <Text style={styles.metaPillCategory}>{event.category?.toUpperCase() ?? "EVENT"}</Text>
+          <Text style={styles.metaPillStatus}>{event.status ?? "UNKNOWN"}</Text>
+        </View>
       </View>
     </Pressable>
   );
 };
 
 export default function CoordinatorHomePage() {
-  const { session, profile, signOut } = useAuth();
+  const { top } = useSafeAreaInsets();
+  const { session, profile } = useAuth();
   const [activeTab, setActiveTab] = useState<CoordinatorTab>("events");
   const [events, setEvents] = useState<PlanningEvent[]>([]);
   const [loading, setLoading] = useState(true);
@@ -113,15 +123,23 @@ export default function CoordinatorHomePage() {
   }
 
   return (
-    <SafeAreaView style={styles.screen}>
+    <View style={styles.screen}>
       <ScrollView
-        contentContainerStyle={styles.content}
+        contentContainerStyle={[styles.content, { paddingTop: Math.max(top, 32) + 16 }]}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={palette.main} />}
       >
-        <View style={styles.headerCard}>
-          <Text style={styles.headerEyebrow}>Coordinator Console</Text>
-          <Text style={styles.headerTitle}>Welcome, {profile?.name ?? "Team Member"}</Text>
-          <Text style={styles.headerSubtitle}>Manage assigned events and verify ticket QR entries.</Text>
+        <View style={styles.headerRow}>
+          <View style={styles.headerTextCol}>
+            <Text style={styles.headerEyebrow}>COORDINATOR CONSOLE</Text>
+            <Text style={styles.headerTitle}>Welcome, {profile?.name ?? "Team Member"}</Text>
+            <Text style={styles.headerSubtitle}>Manage assigned operations and event entries.</Text>
+          </View>
+          <Pressable 
+            onPress={() => router.push("/coordinator/profile" as never)} 
+            style={({ pressed }) => [styles.avatarButton, pressed && styles.avatarPressed]}
+          >
+            <Ionicons name="person-circle" size={54} color={palette.main} />
+          </Pressable>
         </View>
 
         <View style={styles.tabRow}>
@@ -141,6 +159,7 @@ export default function CoordinatorHomePage() {
 
         {activeTab !== "events" ? (
           <View style={styles.placeholderCard}>
+            <Ionicons name="construct-outline" size={32} color={palette.main} style={{ marginBottom: 4 }} />
             <Text style={styles.placeholderTitle}>Coming Soon</Text>
             <Text style={styles.placeholderCopy}>This tab is being prepared for your operations workflow.</Text>
           </View>
@@ -158,14 +177,18 @@ export default function CoordinatorHomePage() {
 
                 <Text style={styles.sectionTitle}>Current Events</Text>
                 {eventBuckets.current.length === 0 ? (
-                  <Text style={styles.emptyText}>No current events assigned.</Text>
+                  <View style={styles.emptyCard}>
+                    <Text style={styles.emptyText}>No current events assigned.</Text>
+                  </View>
                 ) : (
                   eventBuckets.current.map((event) => <EventCard key={`current-${event.eventId}`} event={event} />)
                 )}
 
                 <Text style={styles.sectionTitle}>Upcoming Events</Text>
                 {eventBuckets.upcoming.length === 0 ? (
-                  <Text style={styles.emptyText}>No upcoming events assigned.</Text>
+                  <View style={styles.emptyCard}>
+                    <Text style={styles.emptyText}>No upcoming events assigned.</Text>
+                  </View>
                 ) : (
                   eventBuckets.upcoming.map((event) => <EventCard key={`upcoming-${event.eventId}`} event={event} />)
                 )}
@@ -174,11 +197,8 @@ export default function CoordinatorHomePage() {
           </View>
         ) : null}
 
-        <Pressable onPress={signOut} style={styles.signOutButton}>
-          <Text style={styles.signOutText}>Sign Out</Text>
-        </Pressable>
       </ScrollView>
-    </SafeAreaView>
+    </View>
   );
 }
 
@@ -188,142 +208,195 @@ const styles = StyleSheet.create({
     backgroundColor: palette.secondary,
   },
   content: {
-    padding: 16,
-    paddingBottom: 30,
-    gap: 14,
+    padding: 20,
+    paddingBottom: 40,
+    gap: 24,
   },
-  headerCard: {
-    backgroundColor: palette.main,
-    borderRadius: 18,
-    padding: 18,
+  headerRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    marginTop: 8,
+  },
+  headerTextCol: {
+    flex: 1,
     gap: 6,
+    paddingRight: 16,
   },
   headerEyebrow: {
-    color: "#c6d8ff",
+    color: palette.accent,
     fontWeight: "700",
     fontSize: 12,
-    letterSpacing: 1,
+    letterSpacing: 1.2,
   },
   headerTitle: {
-    color: "#ffffff",
-    fontSize: 26,
+    color: palette.textPrimary,
+    fontSize: 28,
     fontWeight: "800",
+    letterSpacing: -0.5,
   },
   headerSubtitle: {
-    color: "#e8eeff",
-    fontSize: 14,
-    lineHeight: 20,
+    color: palette.textMuted,
+    fontSize: 15,
+    lineHeight: 22,
+  },
+  avatarButton: {
+    borderRadius: 27,
+    backgroundColor: palette.surface,
+    elevation: 4,
+    shadowColor: palette.main,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 10,
+  },
+  avatarPressed: {
+    opacity: 0.7,
   },
   tabRow: {
     flexDirection: "row",
-    gap: 8,
+    gap: 12,
   },
   tabButton: {
     flex: 1,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: palette.border,
-    paddingVertical: 10,
+    borderRadius: 100,
+    paddingVertical: 12,
     alignItems: "center",
     backgroundColor: palette.surface,
+    elevation: 2,
+    shadowColor: palette.textPrimary,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
   },
   tabButtonActive: {
     backgroundColor: palette.main,
-    borderColor: palette.main,
   },
   tabText: {
-    color: palette.main,
-    fontSize: 12,
+    color: palette.textMuted,
+    fontSize: 13,
     fontWeight: "700",
+    letterSpacing: 0.5,
   },
   tabTextActive: {
-    color: "#ffffff",
+    color: "#002c72",
   },
   placeholderCard: {
-    borderRadius: 14,
+    borderRadius: 24,
     backgroundColor: palette.surface,
-    borderWidth: 1,
-    borderColor: palette.border,
-    padding: 16,
-    gap: 6,
+    padding: 32,
+    alignItems: "center",
+    gap: 8,
+    elevation: 3,
+    shadowColor: palette.main,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.06,
+    shadowRadius: 12,
   },
   placeholderTitle: {
-    color: palette.main,
+    color: palette.textPrimary,
     fontSize: 18,
-    fontWeight: "700",
+    fontWeight: "800",
   },
   placeholderCopy: {
     color: palette.textMuted,
     fontSize: 14,
+    textAlign: "center",
     lineHeight: 20,
   },
   eventsWrap: {
-    gap: 10,
+    gap: 16,
   },
   sectionTitle: {
     marginTop: 8,
-    color: palette.main,
-    fontSize: 17,
+    color: palette.textPrimary,
+    fontSize: 19,
     fontWeight: "800",
+    letterSpacing: -0.3,
   },
   eventCard: {
     backgroundColor: palette.surface,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: palette.border,
-    padding: 14,
-    gap: 4,
+    borderRadius: 24,
+    padding: 20,
+    gap: 12,
+    elevation: 3,
+    shadowColor: palette.main,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.06,
+    shadowRadius: 12,
+  },
+  eventCardPressed: {
+    transform: [{ scale: 0.98 }],
+    shadowOpacity: 0.03,
+  },
+  eventCardHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
   },
   eventTitle: {
     color: palette.textPrimary,
-    fontSize: 16,
+    fontSize: 17,
     fontWeight: "700",
+    flex: 1,
+  },
+  eventCardBody: {
+    gap: 12,
+  },
+  eventDetailRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
   },
   eventDate: {
     color: palette.textMuted,
-    fontSize: 13,
+    fontSize: 14,
+    fontWeight: "500",
   },
   metaRow: {
     flexDirection: "row",
     gap: 8,
-    marginTop: 4,
     flexWrap: "wrap",
+    marginTop: 4,
   },
-  metaPill: {
-    backgroundColor: "#e6ebfb",
-    color: palette.main,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
+  metaPillCategory: {
+    backgroundColor: "#313442",
+    color: palette.textPrimary,
+    paddingHorizontal: 12,
+    paddingVertical: 4,
     borderRadius: 999,
-    fontSize: 11,
-    fontWeight: "600",
+    fontSize: 12,
+    fontWeight: "700",
+    letterSpacing: 0.5,
+  },
+  metaPillStatus: {
+    backgroundColor: "rgba(74, 222, 128, 0.15)",
+    color: palette.success,
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: 999,
+    fontSize: 12,
+    fontWeight: "700",
+    letterSpacing: 0.5,
   },
   loadingWrap: {
-    paddingVertical: 28,
+    paddingVertical: 40,
     alignItems: "center",
   },
   errorText: {
     color: palette.danger,
-    fontSize: 13,
-    lineHeight: 19,
+    fontSize: 14,
+    lineHeight: 20,
+    backgroundColor: "rgba(255, 180, 171, 0.15)",
+    padding: 12,
+    borderRadius: 8,
+  },
+  emptyCard: {
+    backgroundColor: "transparent",
+    paddingVertical: 12,
+    alignItems: "flex-start",
   },
   emptyText: {
     color: palette.textMuted,
-    fontSize: 14,
-    marginBottom: 6,
-  },
-  signOutButton: {
-    marginTop: 10,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: palette.border,
-    alignItems: "center",
-    paddingVertical: 12,
-    backgroundColor: palette.surface,
-  },
-  signOutText: {
-    color: palette.main,
-    fontSize: 14,
-    fontWeight: "700",
+    fontSize: 15,
   },
 });
