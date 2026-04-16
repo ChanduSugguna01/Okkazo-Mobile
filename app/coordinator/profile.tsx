@@ -1,25 +1,45 @@
-import { router } from "expo-router";
+import { Redirect, router } from "expo-router";
+import { useEffect, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useAuth } from "@/src/providers/AuthProvider";
+import { getUnreadNotificationCount } from "@/src/services/notifications";
 import { palette } from "@/src/theme/palette";
+import { resolveHomeRoute } from "@/src/utils/roleRouting";
+import CoordinatorBottomMenu from "../../src/components/coordinator/CoordinatorBottomMenu";
 
 export default function CoordinatorProfilePage() {
   const { top } = useSafeAreaInsets();
-  const { profile, signOut } = useAuth();
+  const { profile, session, signOut } = useAuth();
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  useEffect(() => {
+    const loadUnread = async () => {
+      if (!session?.accessToken) return;
+      const count = await getUnreadNotificationCount(session.accessToken).catch(() => 0);
+      setUnreadCount(count);
+    };
+
+    loadUnread();
+  }, [session?.accessToken]);
+
+  if (!session) {
+    return <Redirect href="/login" />;
+  }
+
+  if (resolveHomeRoute(profile, session.role) !== "/coordinator") {
+    return <Redirect href="/coming-soon" />;
+  }
 
   return (
     <View style={styles.screen}>
       <ScrollView contentContainerStyle={[styles.content, { paddingTop: Math.max(top, 32) + 16 }]}>
         <View style={styles.header}>
-          <Pressable 
-            onPress={() => router.back()} 
-            style={({ pressed }) => [styles.backButton, pressed && styles.pressed]}
-          >
-            <Ionicons name="arrow-back" size={24} color={palette.textPrimary} />
-          </Pressable>
+          <View style={styles.backButton}>
+            <Ionicons name="person-circle-outline" size={22} color={palette.textPrimary} />
+          </View>
           <Text style={styles.headerTitle}>Profile</Text>
           <View style={{ width: 40 }} /> {/* Spacer to balance the header */}
         </View>
@@ -48,12 +68,11 @@ export default function CoordinatorProfilePage() {
 
             <View style={styles.infoRow}>
               <View style={styles.iconWrap}>
-                <Ionicons name="call-outline" size={20} color={palette.main} />
+                <Ionicons name="finger-print-outline" size={20} color={palette.main} />
               </View>
               <View style={styles.infoTextCol}>
-                <Text style={styles.infoLabel}>Mobile Number</Text>
-                {/* Fallback to simulated number if not in user model */}
-                <Text style={styles.infoValue}>{profile?.phone ?? "+1 (555) 000-0000"}</Text> 
+                <Text style={styles.infoLabel}>Auth ID</Text>
+                <Text style={styles.infoValue}>{profile?.authId ?? "Not available"}</Text>
               </View>
             </View>
             
@@ -85,6 +104,8 @@ export default function CoordinatorProfilePage() {
         </View>
 
       </ScrollView>
+
+      <CoordinatorBottomMenu activeMenu="profile" unreadCount={unreadCount} />
     </View>
   );
 }
@@ -95,7 +116,7 @@ const styles = StyleSheet.create({
     backgroundColor: palette.secondary,
   },
   content: {
-    paddingBottom: 40,
+    paddingBottom: 130,
   },
   header: {
     flexDirection: "row",
@@ -104,8 +125,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingVertical: 16,
   },
-// ... remaining styles unchanged
-
   headerTitle: {
     fontSize: 20,
     fontWeight: "700",

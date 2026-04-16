@@ -17,6 +17,7 @@ import { getCoordinatorEvents, splitCurrentAndUpcomingEvents } from "@/src/servi
 import { palette } from "@/src/theme/palette";
 import { PlanningEvent } from "@/src/types/events";
 import { resolveHomeRoute } from "@/src/utils/roleRouting";
+import CoordinatorBottomMenu from "../../src/components/coordinator/CoordinatorBottomMenu";
 
 type CoordinatorTab = "events" | "operations" | "reports";
 
@@ -198,6 +199,8 @@ export default function CoordinatorHomePage() {
         ) : null}
 
       </ScrollView>
+
+      <CoordinatorBottomMenu activeMenu="home" />
     </View>
   );
 }
@@ -209,7 +212,7 @@ const styles = StyleSheet.create({
   },
   content: {
     padding: 20,
-    paddingBottom: 40,
+    paddingBottom: 130,
     gap: 24,
   },
   headerRow: {

@@ -51,7 +51,9 @@ export const getCoordinatorEvents = async (token: string, managerUserId?: string
     { token }
   );
 
-  const managerEvents = managerResponse.data?.events ?? [];
+  const managerEvents = (managerResponse.data?.events ?? []).filter(
+    (event) => event.status?.toUpperCase() !== "CANCELLED"
+  );
 
   let allPlanningEvents: PlanningEvent[] = [];
   try {
@@ -69,6 +71,10 @@ export const getCoordinatorEvents = async (token: string, managerUserId?: string
   }
 
   const assigned = allPlanningEvents.filter((event) => {
+    const isCancelled = event.status?.toUpperCase() === "CANCELLED";
+    if (isCancelled) {
+      return false;
+    }
     const isAssignedManager = event.assignedManagerId === managerUserId;
     const isCoreStaff = (event.coreStaffIds ?? []).includes(managerUserId);
     return isAssignedManager || isCoreStaff;

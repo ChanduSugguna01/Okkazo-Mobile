@@ -83,6 +83,14 @@ export default function EventDetailsPage() {
         setLoadingGuests(false);
         return;
       }
+
+      // If we already know it's a private event, skip fetching guests
+      if (event && event.category?.toLowerCase() === "private") {
+        setGuests([]);
+        setLoadingGuests(false);
+        return;
+      }
+
       try {
         setLoadingGuests(true);
         setGuestError(null);
@@ -97,7 +105,7 @@ export default function EventDetailsPage() {
     };
 
     loadGuests();
-  }, [session?.accessToken, normalizedEventId]);
+  }, [session?.accessToken, normalizedEventId, event?.category]);
 
   if (!session) {
     return <Redirect href="/login" />;
@@ -180,7 +188,7 @@ export default function EventDetailsPage() {
         ) : null}
 
         {/* Guest List Section */}
-        {!loading && event ? (
+        {!loading && event && event.category?.toLowerCase() !== "private" ? (
           <View style={styles.guestSection}>
             <Text style={styles.guestTitle}>Guest List</Text>
             
