@@ -42,13 +42,14 @@ const formatDateLabel = (value: string | null | undefined) => {
 
 const EventCard = ({ event }: { event: PlanningEvent }) => {
   const startAt = event.schedule?.startAt ?? event.eventDate;
+  const eventSource = event.eventSource ?? "planning";
 
   return (
     <Pressable
       onPress={() =>
         router.push({
           pathname: "/coordinator/events/[eventId]",
-          params: { eventId: event.eventId },
+          params: { eventId: event.eventId, eventSource },
         })
       }
       style={({ pressed }) => [styles.eventCard, pressed && styles.eventCardPressed]}
@@ -80,7 +81,10 @@ export default function CoordinatorHomePage() {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const managerUserId = profile?.id ?? profile?._id ?? null;
+  const managerUserIds = useMemo(
+    () => [profile?.id, profile?._id, profile?.authId].filter((value): value is string => Boolean(value)),
+    [profile?.id, profile?._id, profile?.authId]
+  );
 
   const loadEvents = useCallback(async () => {
     if (!session?.accessToken) {
@@ -89,13 +93,13 @@ export default function CoordinatorHomePage() {
 
     try {
       setError(null);
-      const nextEvents = await getCoordinatorEvents(session.accessToken, managerUserId);
+      const nextEvents = await getCoordinatorEvents(session.accessToken, managerUserIds);
       setEvents(nextEvents);
     } catch (err) {
       const message = err instanceof Error ? err.message : "Failed to load events";
       setError(message);
     }
-  }, [session?.accessToken, managerUserId]);
+  }, [session?.accessToken, managerUserIds]);
 
   useEffect(() => {
     const init = async () => {

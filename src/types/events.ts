@@ -17,6 +17,7 @@ export interface TicketTier {
 
 export interface PlanningEvent {
   eventId: string;
+  eventSource?: "planning" | "promote";
   eventTitle?: string;
   category?: string;
   status?: string;

@@ -11,7 +11,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useAuth } from "@/src/providers/AuthProvider";
-import { getPlanningEventById, getEventTicketGuests } from "@/src/services/events";
+import { getCoordinatorEventById, getEventTicketGuests } from "@/src/services/events";
 import { palette } from "@/src/theme/palette";
 import { PlanningEvent, EventTicketGuest } from "@/src/types/events";
 
@@ -35,8 +35,12 @@ const formatDateLabel = (value: string | null | undefined) => {
 };
 
 export default function EventDetailsPage() {
-  const { eventId } = useLocalSearchParams<{ eventId?: string | string[] }>();
+  const { eventId, eventSource } = useLocalSearchParams<{
+    eventId?: string | string[];
+    eventSource?: string | string[];
+  }>();
   const { session } = useAuth();
+  const { top } = useSafeAreaInsets();
 
   const [event, setEvent] = useState<PlanningEvent | null>(null);
   const [loading, setLoading] = useState(true);
@@ -54,6 +58,12 @@ export default function EventDetailsPage() {
     return Array.isArray(eventId) ? eventId[0] : eventId;
   }, [eventId]);
 
+  const normalizedSource = useMemo(() => {
+    if (!eventSource) return undefined;
+    const value = Array.isArray(eventSource) ? eventSource[0] : eventSource;
+    return value === "promote" ? "promote" : "planning";
+  }, [eventSource]);
+
   useEffect(() => {
     const load = async () => {
       if (!session?.accessToken || !normalizedEventId) {
@@ -64,7 +74,7 @@ export default function EventDetailsPage() {
       try {
         setLoading(true);
         setError(null);
-        const details = await getPlanningEventById(session.accessToken, normalizedEventId);
+        const details = await getCoordinatorEventById(session.accessToken, normalizedEventId, normalizedSource);
         setEvent(details);
       } catch (err) {
         const message = err instanceof Error ? err.message : "Failed to load event";
@@ -111,7 +121,8 @@ export default function EventDetailsPage() {
     return <Redirect href="/login" />;
   }
 
-  const { top } = useSafeAreaInsets();
+  const isPublicEvent = event?.category?.toLowerCase() !== "private";
+  const canScanTickets = normalizedSource === "promote" || isPublicEvent;
   const startAt = event?.schedule?.startAt ?? event?.eventDate;
   const endAt = event?.schedule?.endAt;
 
@@ -173,17 +184,23 @@ export default function EventDetailsPage() {
               ))}
             </View>
 
-            <Pressable
-              onPress={() =>
-                router.push({
-                  pathname: "/coordinator/scan",
-                  params: { eventId: event.eventId },
-                })
-              }
-              style={styles.scanButton}
-            >
-              <Text style={styles.scanButtonText}>Scan & Verify Ticket QR</Text>
-            </Pressable>
+            {canScanTickets ? (
+              <Pressable
+                onPress={() =>
+                  router.push({
+                    pathname: "/coordinator/scan",
+                    params: { eventId: event.eventId },
+                  })
+                }
+                style={styles.scanButton}
+              >
+                <Text style={styles.scanButtonText}>Scan & Verify Ticket QR</Text>
+              </Pressable>
+            ) : (
+              <Text style={styles.scanHintText}>
+                Ticket scanning is available for public or promote events.
+              </Text>
+            )}
           </View>
         ) : null}
 
@@ -326,6 +343,11 @@ const styles = StyleSheet.create({
     color: "#ffffff",
     fontSize: 14,
     fontWeight: "700",
+  },
+  scanHintText: {
+    color: palette.textMuted,
+    fontSize: 12,
+    lineHeight: 18,
   },
   guestSection: {
     marginTop: 8,

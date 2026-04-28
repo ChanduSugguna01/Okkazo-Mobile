@@ -41,6 +41,9 @@ export default function QrScannerPage() {
   const [isVerifying, setIsVerifying] = useState(false);
   const [hasScanned, setHasScanned] = useState(false);
   const [scanError, setScanError] = useState<string | null>(null);
+  const [permissionError, setPermissionError] = useState<string | null>(null);
+  const [cameraReady, setCameraReady] = useState(false);
+  const [cameraError, setCameraError] = useState<string | null>(null);
   const [manualToken, setManualToken] = useState("");
   const [result, setResult] = useState<QrVerificationResult | null>(null);
   const [warning, setWarning] = useState<string | null>(null);
@@ -77,6 +80,21 @@ export default function QrScannerPage() {
   }, [eventId]);
 
   if (!session) return <Redirect href="/login" />;
+
+  const handleRequestPermission = async () => {
+    setPermissionError(null);
+    const next = await requestPermission();
+    if (!next.granted) {
+      setPermissionError("Camera permission is required to scan tickets.");
+      return;
+    }
+
+    // Reset scan state so camera becomes active immediately after permission is granted.
+    setHasScanned(false);
+    setResult(null);
+    setScanError(null);
+    setWarning(null);
+  };
 
   const runVerification = async (rawValue: string) => {
     const token = parseTokenFromQr(rawValue);
@@ -118,6 +136,8 @@ export default function QrScannerPage() {
     setResult(null);
     setScanError(null);
     setWarning(null);
+    setCameraError(null);
+    setCameraReady(false);
   };
 
   return (
@@ -137,9 +157,26 @@ export default function QrScannerPage() {
             <View style={styles.cameraFrame}>
               <CameraView
                 style={styles.camera}
+                facing="back"
+                active={!hasScanned}
+                onCameraReady={() => setCameraReady(true)}
+                onMountError={(error) =>
+                  setCameraError(error?.message ?? "Unable to start the camera.")
+                }
                 barcodeScannerSettings={{ barcodeTypes: ["qr"] }}
                 onBarcodeScanned={hasScanned ? undefined : handleBarcodeScanned}
               />
+              {!cameraReady && !cameraError ? (
+                <View style={[styles.cameraOverlay, styles.cameraOverlayDim]}>
+                  <ActivityIndicator size="large" color="#ffffff" />
+                  <Text style={styles.cameraLoadingText}>Starting camera…</Text>
+                </View>
+              ) : null}
+              {cameraError ? (
+                <View style={[styles.cameraOverlay, styles.cameraOverlayDim]}>
+                  <Text style={styles.permissionErrorText}>{cameraError}</Text>
+                </View>
+              ) : null}
               {!hasScanned && (
                 <View style={styles.viewfinderOverlay}>
                   <Animated.View 
@@ -165,7 +202,10 @@ export default function QrScannerPage() {
           <View style={styles.glassCard}>
             <Ionicons name="camera" size={48} color={palette.textMuted} style={{ alignSelf: 'center', marginBottom: 12 }} />
             <Text style={styles.permissionText}>Camera access is required for QR scanning.</Text>
-            <Pressable onPress={requestPermission}>
+            {permissionError ? (
+              <Text style={styles.permissionErrorText}>{permissionError}</Text>
+            ) : null}
+            <Pressable onPress={handleRequestPermission}>
               <LinearGradient
                 colors={['#b1c5ff', '#5a8cff']}
                 start={{ x: 0, y: 0 }}
@@ -352,6 +392,12 @@ const styles = StyleSheet.create({
   cameraOverlayDim: {
     backgroundColor: 'rgba(15, 19, 31, 0.7)',
   },
+  cameraLoadingText: {
+    marginTop: 12,
+    color: '#ffffff',
+    fontSize: 14,
+    fontWeight: '600',
+  },
   glassCard: {
     backgroundColor: 'rgba(27, 31, 44, 0.8)', // surface-container at 80%
     borderRadius: 24,
@@ -418,6 +464,12 @@ const styles = StyleSheet.create({
     fontSize: 15,
     textAlign: 'center',
     lineHeight: 22,
+  },
+  permissionErrorText: {
+    color: palette.danger,
+    fontSize: 12,
+    textAlign: 'center',
+    marginBottom: 12,
   },
   resultCard: {
     borderColor: 'rgba(74, 222, 128, 0.3)',
