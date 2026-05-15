@@ -1,5 +1,5 @@
 import { Redirect, router, useLocalSearchParams } from "expo-router";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Pressable,
@@ -14,6 +14,8 @@ import { useAuth } from "@/src/providers/AuthProvider";
 import { getCoordinatorEventById, getEventTicketGuests } from "@/src/services/events";
 import { palette } from "@/src/theme/palette";
 import { PlanningEvent, EventTicketGuest } from "@/src/types/events";
+
+const GUEST_POLL_INTERVAL_MS = 4000;
 
 const formatDateLabel = (value: string | null | undefined) => {
   if (!value) {
@@ -49,6 +51,7 @@ export default function EventDetailsPage() {
   const [guests, setGuests] = useState<EventTicketGuest[]>([]);
   const [loadingGuests, setLoadingGuests] = useState(true);
   const [guestError, setGuestError] = useState<string | null>(null);
+  const guestPollInFlightRef = useRef(false);
 
   const normalizedEventId = useMemo(() => {
     if (!eventId) {
@@ -87,35 +90,70 @@ export default function EventDetailsPage() {
     load();
   }, [session?.accessToken, normalizedEventId]);
 
-  useEffect(() => {
-    const loadGuests = async () => {
+  const fetchGuests = useCallback(
+    async (options: { silent?: boolean } = {}) => {
       if (!session?.accessToken || !normalizedEventId) {
-        setLoadingGuests(false);
+        if (!options.silent) {
+          setLoadingGuests(false);
+        }
         return;
       }
 
       // If we already know it's a private event, skip fetching guests
       if (event && event.category?.toLowerCase() === "private") {
-        setGuests([]);
-        setLoadingGuests(false);
+        if (!options.silent) {
+          setGuests([]);
+          setLoadingGuests(false);
+        }
         return;
       }
 
       try {
-        setLoadingGuests(true);
-        setGuestError(null);
+        if (!options.silent) {
+          setLoadingGuests(true);
+          setGuestError(null);
+        }
         const guestData = await getEventTicketGuests(session.accessToken, normalizedEventId);
         setGuests(guestData || []);
       } catch (err) {
-        const message = err instanceof Error ? err.message : "Failed to load guest list";
-        setGuestError(message);
+        if (!options.silent) {
+          const message = err instanceof Error ? err.message : "Failed to load guest list";
+          setGuestError(message);
+        }
       } finally {
-        setLoadingGuests(false);
+        if (!options.silent) {
+          setLoadingGuests(false);
+        }
+      }
+    },
+    [session?.accessToken, normalizedEventId, event?.category]
+  );
+
+  useEffect(() => {
+    fetchGuests();
+  }, [fetchGuests]);
+
+  useEffect(() => {
+    if (!session?.accessToken || !normalizedEventId) return;
+    if (event && event.category?.toLowerCase() === "private") return;
+
+    const allowPolling = normalizedSource === "promote" || event?.category?.toLowerCase() !== "private";
+    if (!allowPolling) return;
+
+    const poll = async () => {
+      if (guestPollInFlightRef.current) return;
+      guestPollInFlightRef.current = true;
+      try {
+        await fetchGuests({ silent: true });
+      } finally {
+        guestPollInFlightRef.current = false;
       }
     };
 
-    loadGuests();
-  }, [session?.accessToken, normalizedEventId, event?.category]);
+    poll();
+    const timer = setInterval(poll, GUEST_POLL_INTERVAL_MS);
+    return () => clearInterval(timer);
+  }, [session?.accessToken, normalizedEventId, normalizedSource, event?.category, fetchGuests]);
 
   if (!session) {
     return <Redirect href="/login" />;

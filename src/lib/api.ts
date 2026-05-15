@@ -139,7 +139,6 @@ export const request = async <T>(path: string, options: RequestOptions = {}): Pr
 
   const requestHeaders: Record<string, string> = {
     Accept: "application/json",
-    "ngrok-skip-browser-warning": "true",
     ...(headers ?? {}),
   };
 

@@ -11,6 +11,9 @@
     },
     "preview-apk": {
       "distribution": "internal",
+      "env": {
+        "EXPO_PUBLIC_BACKEND_URL": "http://localhost:8080"
+      },
       "android": {
         "buildType": "apk",
         "credentialsSource": "local"

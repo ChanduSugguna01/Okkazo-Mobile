@@ -34,15 +34,29 @@ export interface PlanningEvent {
 
 export interface QrVerificationResult {
   valid: boolean;
+  alreadyScanned?: boolean;
+  message?: string;
   ticketId: string;
   eventId: string;
   eventTitle: string;
   eventSource: string;
   ticketStatus: string;
+  verificationStatus?: string;
   quantity: number;
   tiers: TicketTier[];
+  selectedDay?: string | null;
   paidAt: string | null;
-  scannedAt: string;
+  verifiedAt?: string;
+  lastScannedAt?: string;
+  scanCount?: number;
+  scannedByAuthId?: string | null;
+  scannedByRole?: string | null;
+  scanHistory?: Array<{
+    scannedAt: string;
+    scannedByAuthId: string | null;
+    scannedByRole: string | null;
+    outcome: string;
+  }>;
 }
 
 export interface EventTicketGuest {

@@ -219,7 +219,12 @@ export const verifyTicketQr = async (token: string, qrToken: string) => {
       body: { token: qrToken },
     }
   );
-
+  if (!response.success) {
+    throw new Error(response.message || "Ticket verification failed");
+  }
+  if (!response.data) {
+    throw new Error("Ticket verification failed");
+  }
   return response.data;
 };
 
@@ -231,6 +236,7 @@ export const getEventTicketGuests = async (token: string, eventId: string) => {
 
 export const splitCurrentAndUpcomingEvents = (events: PlanningEvent[]) => {
   const now = new Date();
+  const checkinWindowMs = 60 * 60 * 1000;
   const current: PlanningEvent[] = [];
   const upcoming: PlanningEvent[] = [];
 
@@ -242,12 +248,17 @@ export const splitCurrentAndUpcomingEvents = (events: PlanningEvent[]) => {
       continue;
     }
 
-    if (startDate.getTime() > now.getTime()) {
+    const checkinStart = new Date(startDate.getTime() - checkinWindowMs);
+    const checkinEnd = new Date(startDate.getTime() + checkinWindowMs);
+    const effectiveEnd = endDate && endDate.getTime() > checkinEnd.getTime()
+      ? endDate
+      : checkinEnd;
+    if (checkinStart.getTime() > now.getTime()) {
       upcoming.push(event);
       continue;
     }
 
-    if (endDate && endDate.getTime() < now.getTime()) {
+    if (effectiveEnd.getTime() < now.getTime()) {
       continue;
     }
 
