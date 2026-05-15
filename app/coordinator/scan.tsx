@@ -1,6 +1,6 @@
 import { BarcodeScanningResult, CameraView, useCameraPermissions } from "expo-camera";
 import { Redirect, router, useLocalSearchParams } from "expo-router";
-import { useMemo, useState, useEffect } from "react";
+import { useMemo, useState, useEffect, useRef, useCallback } from "react";
 import {
   ActivityIndicator,
   Pressable,
@@ -11,6 +11,7 @@ import {
   View,
   Animated,
   Easing,
+  Platform,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -32,6 +33,11 @@ const parseTokenFromQr = (rawValue: string) => {
   }
 };
 
+const CAMERA_READY_TIMEOUT_MS = 4000;
+const DUPLICATE_SCAN_WINDOW_MS = 1500;
+const VIEWFINDER_PADDING = 40;
+const SCAN_LINE_HEIGHT = 3;
+
 export default function QrScannerPage() {
   const { top } = useSafeAreaInsets();
   const { eventId } = useLocalSearchParams<{ eventId?: string | string[] }>();
@@ -44,19 +50,28 @@ export default function QrScannerPage() {
   const [permissionError, setPermissionError] = useState<string | null>(null);
   const [cameraReady, setCameraReady] = useState(false);
   const [cameraError, setCameraError] = useState<string | null>(null);
+  const [cameraKey, setCameraKey] = useState(0);
   const [manualToken, setManualToken] = useState("");
   const [result, setResult] = useState<QrVerificationResult | null>(null);
   const [warning, setWarning] = useState<string | null>(null);
+  const [viewfinderHeight, setViewfinderHeight] = useState(0);
+  const scanLockRef = useRef(false);
+  const lastScanRef = useRef<{ token: string; at: number } | null>(null);
 
   // Scan line animation
   const scanLineAnim = useMemo(() => new Animated.Value(0), []);
 
   useEffect(() => {
-    if (permission?.granted && !hasScanned) {
+    if (permission?.granted && !hasScanned && viewfinderHeight > 0) {
+      const travelDistance = Math.max(
+        0,
+        viewfinderHeight - VIEWFINDER_PADDING * 2 - SCAN_LINE_HEIGHT
+      );
+      scanLineAnim.setValue(0);
       Animated.loop(
         Animated.sequence([
           Animated.timing(scanLineAnim, {
-            toValue: 280,
+            toValue: travelDistance,
             duration: 2000,
             easing: Easing.linear,
             useNativeDriver: true,
@@ -72,7 +87,16 @@ export default function QrScannerPage() {
     } else {
       scanLineAnim.stopAnimation();
     }
-  }, [permission?.granted, hasScanned, scanLineAnim]);
+  }, [permission?.granted, hasScanned, scanLineAnim, viewfinderHeight]);
+
+  useEffect(() => {
+    if (!permission?.granted || cameraReady || cameraError) return;
+    const timer = setTimeout(() => {
+      setCameraError("Camera failed to start. Tap to retry.");
+    }, CAMERA_READY_TIMEOUT_MS);
+
+    return () => clearTimeout(timer);
+  }, [permission?.granted, cameraReady, cameraError]);
 
   const expectedEventId = useMemo(() => {
     if (!eventId) return "";
@@ -103,11 +127,28 @@ export default function QrScannerPage() {
       return;
     }
 
+    if (scanLockRef.current) return;
+
+    const now = Date.now();
+    const last = lastScanRef.current;
+    if (last && last.token === token && now - last.at < DUPLICATE_SCAN_WINDOW_MS) {
+      return;
+    }
+    lastScanRef.current = { token, at: now };
+    scanLockRef.current = true;
+
     try {
       setIsVerifying(true);
       setScanError(null);
       setWarning(null);
       const verification = await verifyTicketQr(session.accessToken, token);
+      if (verification?.alreadyScanned) {
+        setScanError("Ticket has already been scanned.");
+        setResult(null);
+        setHasScanned(true);
+        return;
+      }
+
       setResult(verification);
       setHasScanned(true);
 
@@ -123,8 +164,15 @@ export default function QrScannerPage() {
       setResult(null);
     } finally {
       setIsVerifying(false);
+      scanLockRef.current = false;
     }
   };
+
+  const retryCamera = useCallback(() => {
+    setCameraError(null);
+    setCameraReady(false);
+    setCameraKey((value) => value + 1);
+  }, []);
 
   const handleBarcodeScanned = async (scan: BarcodeScanningResult) => {
     if (hasScanned || isVerifying) return;
@@ -138,28 +186,34 @@ export default function QrScannerPage() {
     setWarning(null);
     setCameraError(null);
     setCameraReady(false);
+    setManualToken("");
+    lastScanRef.current = null;
   };
 
   return (
     <View style={styles.screen}>
-      <ScrollView contentContainerStyle={[styles.content, { paddingTop: Math.max(top, 32) + 16 }]}>
-        <View style={styles.header}>
-          <Pressable onPress={() => router.back()} style={styles.backButton}>
-            <Ionicons name="chevron-back" size={24} color={palette.main} />
-            <Text style={styles.backText}>Back</Text>
-          </Pressable>
-          <Text style={styles.title}>Scan Ticket</Text>
-          <Text style={styles.subtitle}>Point the camera at attendee ticket QR to verify entries.</Text>
-        </View>
+      <View style={[styles.header, styles.contentPadding, { paddingTop: Math.max(top, 32) + 16 }]}>
+        <Pressable onPress={() => router.back()} style={styles.backButton}>
+          <Ionicons name="chevron-back" size={24} color={palette.main} />
+          <Text style={styles.backText}>Back</Text>
+        </Pressable>
+        <Text style={styles.title}>Scan Ticket</Text>
+        <Text style={styles.subtitle}>Point the camera at attendee ticket QR to verify entries.</Text>
+      </View>
 
-        {permission?.granted ? (
-          <View style={styles.cameraContainer}>
-            <View style={styles.cameraFrame}>
+      {permission?.granted ? (
+        <View style={[styles.contentPadding, styles.cameraSection]}>
+          <View style={styles.cameraContainer} collapsable={false}>
+            <View style={styles.cameraFrame} collapsable={false}>
               <CameraView
+                key={cameraKey}
                 style={styles.camera}
                 facing="back"
                 active={!hasScanned}
-                onCameraReady={() => setCameraReady(true)}
+                onCameraReady={() => {
+                  setCameraReady(true);
+                  setCameraError(null);
+                }}
                 onMountError={(error) =>
                   setCameraError(error?.message ?? "Unable to start the camera.")
                 }
@@ -173,12 +227,16 @@ export default function QrScannerPage() {
                 </View>
               ) : null}
               {cameraError ? (
-                <View style={[styles.cameraOverlay, styles.cameraOverlayDim]}>
+                <Pressable onPress={retryCamera} style={[styles.cameraOverlay, styles.cameraOverlayDim]}>
                   <Text style={styles.permissionErrorText}>{cameraError}</Text>
-                </View>
+                  <Text style={styles.cameraRetryText}>Tap to retry</Text>
+                </Pressable>
               ) : null}
               {!hasScanned && (
-                <View style={styles.viewfinderOverlay}>
+                <View
+                  style={styles.viewfinderOverlay}
+                  onLayout={(event) => setViewfinderHeight(event.nativeEvent.layout.height)}
+                >
                   <Animated.View 
                     style={[
                       styles.scanLine, 
@@ -198,7 +256,9 @@ export default function QrScannerPage() {
               )}
             </View>
           </View>
-        ) : (
+        </View>
+      ) : (
+        <View style={styles.contentPadding}>
           <View style={styles.glassCard}>
             <Ionicons name="camera" size={48} color={palette.textMuted} style={{ alignSelf: 'center', marginBottom: 12 }} />
             <Text style={styles.permissionText}>Camera access is required for QR scanning.</Text>
@@ -216,8 +276,14 @@ export default function QrScannerPage() {
               </LinearGradient>
             </Pressable>
           </View>
-        )}
+        </View>
+      )}
 
+      <ScrollView
+        contentContainerStyle={[styles.scrollContent, styles.contentPadding]}
+        keyboardShouldPersistTaps="handled"
+        removeClippedSubviews={false}
+      >
         <View style={styles.glassCard}>
           <Text style={styles.manualLabel}>Manual Verification</Text>
           <TextInput
@@ -231,10 +297,10 @@ export default function QrScannerPage() {
           />
           <Pressable
             onPress={() => runVerification(manualToken)}
-            disabled={isVerifying}
+            disabled={isVerifying || hasScanned}
           >
              <LinearGradient
-                colors={isVerifying ? ['#3a485b', '#3a485b'] : ['#b1c5ff', '#5a8cff']}
+                colors={isVerifying || hasScanned ? ['#3a485b', '#3a485b'] : ['#b1c5ff', '#5a8cff']}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 0 }}
                 style={styles.primaryButton}
@@ -311,10 +377,13 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#0f131f', // background
   },
-  content: {
-    padding: 24,
+  contentPadding: {
+    paddingHorizontal: 24,
+  },
+  scrollContent: {
     gap: 20,
     paddingBottom: 60,
+    paddingTop: 20,
   },
   header: {
     gap: 8,
@@ -346,8 +415,8 @@ const styles = StyleSheet.create({
   cameraContainer: {
     width: '100%',
     aspectRatio: 1,
-    borderRadius: 32,
-    overflow: 'hidden',
+    borderRadius: Platform.OS === 'ios' ? 32 : 0,
+    overflow: Platform.OS === 'ios' ? 'hidden' : 'visible',
     backgroundColor: '#1b1f2c', // surface-container
     elevation: 10,
     shadowColor: '#b1c5ff',
@@ -355,16 +424,19 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.15,
     shadowRadius: 20,
   },
+  cameraSection: {
+    marginTop: 12,
+  },
   cameraFrame: {
     flex: 1,
     position: 'relative',
   },
   camera: {
-    flex: 1,
+    ...StyleSheet.absoluteFillObject,
   },
   viewfinderOverlay: {
     ...StyleSheet.absoluteFillObject,
-    padding: 40,
+    padding: VIEWFINDER_PADDING,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -372,7 +444,8 @@ const styles = StyleSheet.create({
     position: 'absolute',
     left: '10%',
     right: '10%',
-    height: 3,
+    top: VIEWFINDER_PADDING,
+    height: SCAN_LINE_HEIGHT,
     backgroundColor: 'rgba(177, 197, 255, 0.8)',
     borderRadius: 2,
     shadowColor: '#b1c5ff',
@@ -396,6 +469,12 @@ const styles = StyleSheet.create({
     marginTop: 12,
     color: '#ffffff',
     fontSize: 14,
+    fontWeight: '600',
+  },
+  cameraRetryText: {
+    marginTop: 8,
+    color: '#ffffff',
+    fontSize: 12,
     fontWeight: '600',
   },
   glassCard: {
